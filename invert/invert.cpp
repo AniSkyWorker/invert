@@ -1,63 +1,93 @@
 #include "stdafx.h"
+#include "storage_adapters.h"
 #include <boost/numeric/ublas/matrix.hpp>
 #include <boost/numeric/ublas/lu.hpp>
 #include <boost/numeric/ublas/assignment.hpp>
 #include <boost/numeric/ublas/io.hpp>
-#include <fstream>
 #include <iomanip>
+#include <fstream>
 
- 
-template<class T>
-bool InvertMatrix(const  boost::numeric::ublas::matrix<T>& input, boost::numeric::ublas::matrix<T>& inverse)
+const int C_MATRIX_SIZE = 3;
+namespace ublas = boost::numeric::ublas;
+typedef boost::numeric::ublas::matrix<float> floatMatrix;
+
+bool InvertMatrix(const floatMatrix& inputMatrix, floatMatrix& inverseMatrix)
 {
-	typedef  boost::numeric::ublas::permutation_matrix<std::size_t> pmatrix;
+	typedef ublas::permutation_matrix<std::size_t> permutation_matrix_t;
 
-	boost::numeric::ublas::matrix<T> A(input);
-	pmatrix pm(A.size1());
+	ublas::matrix<float> matrix(inputMatrix);
+	permutation_matrix_t permutationMatrix(matrix.size1());
 
-	auto res = boost::numeric::ublas::lu_factorize(A, pm);
-	if (res != 0)
+	auto det = ublas::lu_factorize(matrix, permutationMatrix);
+	if (det != 0)
+	{
 		return false;
-	inverse.assign(boost::numeric::ublas::identity_matrix<T>(A.size1()));
-	boost::numeric::ublas::lu_substitute(A, pm, inverse);
+	}
+
+	inverseMatrix.assign(ublas::identity_matrix<float>(matrix.size1()));
+	ublas::lu_substitute(matrix, permutationMatrix, inverseMatrix);
 
 	return true;
 }
 
-#include "storage_adapters.h"
-
-int main(int argc,char * argv[])
+bool ReadMatrixFromFile(const std::string& fileName, float inputArray[C_MATRIX_SIZE][C_MATRIX_SIZE])
 {
-	float inputArray[3][3];
-	std::ifstream inputFile(argv[1]);
+	std::ifstream inputFile(fileName);
 
 	if (inputFile.is_open())
 	{
-		for (std::size_t i = 0; i < 3; i++)
-			for (std::size_t j = 0; j < 3; j++)
+		for (std::size_t i = 0; i < C_MATRIX_SIZE; i++)
+		{
+			for (std::size_t j = 0; j < C_MATRIX_SIZE; j++)
+			{
 				inputFile >> inputArray[i][j];
+			}
+		}
+
 		if (inputFile.fail())
 		{
-			std::cout << "Incorrect matrix in file!";
-			return 1;
+			std::cout << "Incorrect matrix in file!" << std::endl;
+			return false;
 		}
 	}
 	else
 	{
-		std::cout << "Incorrect name of file!";
+		std::cout << "Incorrect name of file!" << std::endl;
+		return false;
+	}
+
+	return true;
+}
+
+int main(int argc,char * argv[])
+{
+	if (argc != 2)
+	{
+		std::cout << "Incorrect inputted arguments!" << std::endl
+			<< "Usage: invert.exe <inputFile>" << std::endl;
 		return 1;
 	}
 
-	boost::numeric::ublas::matrix<float> inputMat(3, 3), inverseMat(3, 3);
+	float inputArray[C_MATRIX_SIZE][C_MATRIX_SIZE];
 
-	inputMat = boost::numeric::ublas::make_matrix_from_pointer(inputArray);
+	if (!ReadMatrixFromFile(argv[1], inputArray))
+	{
+		return 1;
+	}
+
+	floatMatrix inputMat(C_MATRIX_SIZE, C_MATRIX_SIZE), inverseMat(C_MATRIX_SIZE, C_MATRIX_SIZE);
+	inputMat = ublas::make_matrix_from_pointer(inputArray);
+
 	if (InvertMatrix(inputMat, inverseMat))
+	{
 		std::cout << std::setprecision(3) << "Inverted matrix =" << inverseMat << std::endl;
+	}
 	else
 	{
-		std::cout << "Inputted matrix cannot be inverted";
+		std::cout << "Inputted matrix cannot be inverted" << std::endl;
 		return 1;
 	}
+
     return 0;
 }
 
